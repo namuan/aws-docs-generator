@@ -1,0 +1,7 @@
+venv/
+data/raw
+.idea/
+*.iml
+output/
+data/database
+__pycache__

@@ -1,0 +1,7 @@
+attrs
+cattrs
+flake8
+black
+python-slugify
+peewee
+psycopg2-binary
