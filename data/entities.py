@@ -27,6 +27,7 @@ class BaseModel(Model):
 class CodeDocumentItem(BaseModel):
     doc_sha = CharField(unique=True)
     topic = CharField()
+    description = CharField(null=True, default="")
     source_syntax = CharField()
     doc_md = TextField(null=True, default="")
     time_stamp = DateTimeField(default=datetime.datetime.now, index=True)

@@ -6,6 +6,7 @@ And a Markdown page for each code snippet.
 """
 import base64
 import hashlib
+import re
 from argparse import ArgumentParser
 from pathlib import Path
 
@@ -16,25 +17,51 @@ def _flatten_sources(source_dir, file_type):
     return [file for file in source_dir.glob(file_type)]
 
 
-def extract_snippet(f):
-    pass
+def match_line(line, regex):
+    matches = regex.findall(line)
+    if matches:
+        return matches[0]
+    else:
+        return None
 
 
-def filter_code(f):
-    pass
+rgx_source_description = re.compile('snippet-sourcedescription:\[([\w+\.\s\'\-]+)\]*')
+rgx_source_service = re.compile('snippet-service:\[(.*)\]')
+rgx_source_syntax = re.compile('snippet-sourcesyntax:\[(.*)\]')
 
 
-def process_file(f):
-    snippets_map = extract_snippet(f)
-    code = filter_code(f)
-    return snippets_map, code
+def extract_snippet(code_doc: CodeDocumentItem, f: Path):
+    description = ''
+    syntax = ''
+    service = ''
+    for line in f.read_text(encoding='utf-8').split('\n'):
+        description = match_line(line, rgx_source_description) if not description else description
+        service = match_line(line, rgx_source_service) if not service else service
+        syntax = match_line(line, rgx_source_syntax) if not syntax else syntax
+        if not (description or service or syntax):
+            print("===> NO MATCH: {}".format(line))
+
+    code_doc.cloud_service = service
+    code_doc.source_syntax = syntax
+    code_doc.description = description
+
+
+def filter_code(code_doc: CodeDocumentItem, f: Path):
+    return ""
+
+
+def process_file(code_doc: CodeDocumentItem, f):
+    extract_snippet(code_doc, f)
+    filter_code(code_doc, f)
 
 
 def generate_documentation(f, syntax) -> CodeDocumentItem:
     doc_sha = hashlib.blake2b(bytes(f.read_text(), encoding="utf-8")).hexdigest()
-    source_syntax = syntax
     topic = f.stem
-    description = "How to retrieve details about your Amazon EC2 instances"
+
+    code_doc = CodeDocumentItem(doc_sha=doc_sha, topic=topic, source_syntax=syntax)
+    process_file(code_doc, f)
+
     parsed_source = """
 import boto3
 
@@ -44,21 +71,26 @@ print(response)
     """
 
     md = f"""
-### {topic}
+### {code_doc.topic}
 
-{description}
+{code_doc.description}
 
-```{source_syntax}
+```{code_doc.source_syntax}
 {parsed_source}
 ```
     """
 
     doc_in_bytes = bytes(md, encoding="utf-8")
     encoded_doc = base64.standard_b64encode(doc_in_bytes)
-    return CodeDocumentItem(source_syntax="python", topic=topic, doc_md=encoded_doc, doc_sha=doc_sha)
+    code_doc.doc_md = encoded_doc
+    return code_doc
 
 
-guides = [dict(source_dir="python", file_glob="**/*.py", syntax="python")]
+guides = [
+    dict(source_dir="python", file_glob="**/*.py", syntax="python"),
+    dict(source_dir="php", file_glob="**/*.php", syntax="php"),
+    dict(source_dir="ruby", file_glob="**/*.rb", syntax="ruby"),
+]
 
 
 def process():
